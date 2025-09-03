@@ -13,9 +13,32 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Monday.com API settings from Streamlit secrets
-API_TOKEN = st.secrets["monday"]["api_token"]
-BOARD_ID = st.secrets["monday"]["board_id"]
+# Monday.com API settings from secrets.toml
+def load_credentials():
+    """Load credentials from Streamlit secrets.toml file"""
+    try:
+        # Access Streamlit secrets
+        api_token = st.secrets["monday"]["api_token"]
+        ads_board_id = int(st.secrets["monday"]["ads_board_id"])
+        
+        credentials = {
+            'api_token': api_token,
+            'ads_board_id': ads_board_id
+        }
+        
+        return credentials
+    except KeyError as e:
+        st.error(f"Missing configuration in secrets.toml: {str(e)}")
+        st.error("Please ensure your .streamlit/secrets.toml file contains the required Monday.com API credentials.")
+        st.stop()
+    except Exception as e:
+        st.error(f"Error reading secrets: {str(e)}")
+        st.error("Please check your .streamlit/secrets.toml file configuration.")
+        st.stop()
+
+credentials = load_credentials()
+API_TOKEN = credentials['api_token']
+ADS_BOARD_ID = credentials['ads_board_id']
 
 # Custom CSS for better embedding and responsive design
 st.markdown("""
@@ -75,7 +98,7 @@ def get_monday_data():
     
     query = f"""
     query {{
-        boards(ids: {BOARD_ID}) {{
+        boards(ids: {ADS_BOARD_ID}) {{
             items_page(limit: 100) {{
                 items {{
                     id
@@ -96,6 +119,15 @@ def get_monday_data():
     
     try:
         response = requests.post(url, json={"query": query}, headers=headers, timeout=30)
+        
+        # Debug information
+        st.write(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 401:
+            st.error("401 Unauthorized: Check your API token and permissions.")
+            st.write("Make sure your API token is valid and has access to the board.")
+            return None
+        
         response.raise_for_status()
         return response.json()
     except requests.exceptions.Timeout:
@@ -103,6 +135,8 @@ def get_monday_data():
         return None
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching data: {str(e)}")
+        if hasattr(e, 'response') and e.response is not None:
+            st.write(f"Response content: {e.response.text}")
         return None
     except Exception as e:
         st.error(f"Unexpected error: {str(e)}")
@@ -169,12 +203,12 @@ def format_data(data):
 def main():
     """Main application function"""
     # Header
-    st.markdown('<div class="embed-header">📊 Google Ads Attribution Dashboard</div>', unsafe_allow_html=True)
+    st.markdown('<div class="embed-header">📊 GOOGLE ADS ATTRIBUTION DASHBOARD</div>', unsafe_allow_html=True)
     
     # Sidebar for configuration
     with st.sidebar:
         st.header("⚙️ Settings")
-        st.info(f"Board ID: {BOARD_ID}")
+        st.info(f"Ads Board ID: {ADS_BOARD_ID}")
         st.info(f"Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
         # Refresh button
