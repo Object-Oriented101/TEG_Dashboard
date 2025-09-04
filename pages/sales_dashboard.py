@@ -24,28 +24,30 @@ def format_currency(value):
     else:
         return f"${value:.0f}"
 
-# Monday.com API settings from secrets.toml
+# Monday.com API settings from credentials.txt
 def load_credentials():
-    """Load credentials from Streamlit secrets.toml file"""
+    """Load credentials from credentials.txt file"""
+    credentials = {}
     try:
-        # Access Streamlit secrets
-        api_token = st.secrets["monday"]["api_token"]
-        sales_board_id = int(st.secrets["monday"]["sales_board_id"])
-        
-        credentials = {
-            'api_token': api_token,
-            'sales_board_id': sales_board_id
-        }
-        
-        return credentials
-    except KeyError as e:
-        st.error(f"Missing configuration in secrets.toml: {str(e)}")
-        st.error("Please ensure your .streamlit/secrets.toml file contains the required Monday.com API credentials.")
+        with open('credentials.txt', 'r') as f:
+            for line in f:
+                line = line.strip()
+                if '=' in line and not line.startswith('[') and not line.startswith('#'):
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")  # Remove quotes
+                    if key == 'api_token':
+                        credentials['api_token'] = value
+                    elif key == 'sales_board_id':
+                        credentials['sales_board_id'] = int(value)
+    except FileNotFoundError:
+        st.error("credentials.txt file not found. Please create it with your Monday.com API credentials.")
         st.stop()
     except Exception as e:
-        st.error(f"Error reading secrets: {str(e)}")
-        st.error("Please check your .streamlit/secrets.toml file configuration.")
+        st.error(f"Error reading credentials: {str(e)}")
         st.stop()
+    
+    return credentials
 
 credentials = load_credentials()
 API_TOKEN = credentials['api_token']
@@ -194,7 +196,7 @@ def process_sales_data(data):
             "Amount Paid or Contract Value": "",
             "Contract Amount": "",
             "Numbers3": "",
-            "Assigned": "",
+            "Assigned Person": "",
             "Client Type": ""
         }
         
@@ -208,8 +210,8 @@ def process_sales_data(data):
                 record["Contract Amount"] = text if text else ""
             elif col_id == "numbers3":  # Numbers3 column
                 record["Numbers3"] = text if text else ""
-            elif col_id == "person":  # Assigned
-                record["Assigned"] = text if text else ""
+            elif col_id == "person":  # Assigned Person
+                record["Assigned Person"] = text if text else ""
             elif col_id == "status_14__1":  # Client Type (CORRECT COLUMN)
                 record["Client Type"] = text if text else ""
             elif col_id == "date_mktq7npm":  # CORRECT Close Date (Date MK7)
@@ -402,7 +404,7 @@ def main():
         st.info("No sales data available for 2025.")
     
     # 2. Sales by Year (All Years)
-    st.subheader("Sales by Year (All Years)")
+    st.subheader("Sales by Year")
     # Extract year and month for all filtered data
     df_filtered['Close Date'] = pd.to_datetime(df_filtered['Close Date'], errors='coerce')
     df_filtered['Year'] = df_filtered['Close Date'].dt.year
@@ -436,7 +438,7 @@ def main():
     st.plotly_chart(fig_yearly, use_container_width=True)
     
     # 3. Comparison of Revenue by Year by Month (All Years)
-    st.subheader("Comparison of Revenue by Year by Month (All Years)")
+    st.subheader("Comparison of Revenue by Year by Month")
     
     # Create pivot table for grouped bar chart using all filtered data
     monthly_yearly = df_filtered.groupby(['Year', 'Month', 'Month_Name'])['Total Value'].sum().reset_index()
@@ -480,6 +482,13 @@ def main():
         xaxis=dict(
             categoryorder='array',
             categoryarray=month_order_filtered
+        ),
+        legend=dict(
+            orientation="h",   # horizontal
+            yanchor="top",
+            y=-0.2,            # below the chart
+            xanchor="center",
+            x=0.5
         )
     )
     
@@ -496,7 +505,7 @@ def main():
     df_salesman_year = df_filtered[df_filtered['Year'] == selected_year_salesman]
     
     if not df_salesman_year.empty:
-        salesman_monthly = df_salesman_year.groupby(['Month', 'Month_Name', 'Assigned'])['Total Value'].sum().reset_index()
+        salesman_monthly = df_salesman_year.groupby(['Month', 'Month_Name', 'Assigned Person'])['Total Value'].sum().reset_index()
         salesman_monthly = salesman_monthly.sort_values('Month')
         
         # Create proper month order for x-axis
@@ -510,7 +519,7 @@ def main():
         # Create grouped bar chart by salesman with hardcoded colors
         fig_salesman = go.Figure()
         
-        salesmen = sorted(salesman_monthly['Assigned'].unique())
+        salesmen = sorted(salesman_monthly['Assigned Person'].unique())
         
         # Hardcoded colors for specific salesmen
         salesman_colors = {
@@ -525,7 +534,7 @@ def main():
         all_colors = ['#DDA0DD', '#98D8C8', '#F7DC6F', '#FF8A80', '#26A69A', '#42A5F5', '#66BB6A', '#FFCA28']
         
         for i, salesman in enumerate(salesmen):
-            salesman_data = salesman_monthly[salesman_monthly['Assigned'] == salesman]
+            salesman_data = salesman_monthly[salesman_monthly['Assigned Person'] == salesman]
             
             # Handle empty salesmen
             salesman_name = salesman if salesman and salesman.strip() else 'Unassigned'
@@ -558,6 +567,13 @@ def main():
             xaxis=dict(
                 categoryorder='array',
                 categoryarray=month_order_filtered
+            ),
+            legend=dict(
+                orientation="h",   # horizontal
+                yanchor="top",
+                y=-0.2,            # below the chart
+                xanchor="center",
+                x=0.5
             )
         )
         st.plotly_chart(fig_salesman, use_container_width=True)
@@ -630,13 +646,20 @@ def main():
             xaxis_title='Month',
             yaxis_title='Revenue ($)',
             height=500,
-            bargap=0.15,
+            bargap=0.0,
             bargroupgap=0.0,
             showlegend=True,
             font=dict(size=14),  # Larger font for all text
             xaxis=dict(
                 categoryorder='array',
                 categoryarray=month_order_filtered
+            ),
+            legend=dict(
+                orientation="h",   # horizontal
+                yanchor="top",
+                y=-0.2,            # below the chart
+                xanchor="center",
+                x=0.5
             )
         )
         st.plotly_chart(fig_category, use_container_width=True)

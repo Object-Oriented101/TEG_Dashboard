@@ -13,28 +13,30 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Monday.com API settings from secrets.toml
+# Monday.com API settings from credentials.txt
 def load_credentials():
-    """Load credentials from Streamlit secrets.toml file"""
+    """Load credentials from credentials.txt file"""
+    credentials = {}
     try:
-        # Access Streamlit secrets
-        api_token = st.secrets["monday"]["api_token"]
-        ads_board_id = int(st.secrets["monday"]["ads_board_id"])
-        
-        credentials = {
-            'api_token': api_token,
-            'ads_board_id': ads_board_id
-        }
-        
-        return credentials
-    except KeyError as e:
-        st.error(f"Missing configuration in secrets.toml: {str(e)}")
-        st.error("Please ensure your .streamlit/secrets.toml file contains the required Monday.com API credentials.")
+        with open('credentials.txt', 'r') as f:
+            for line in f:
+                line = line.strip()
+                if '=' in line and not line.startswith('[') and not line.startswith('#'):
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")  # Remove quotes
+                    if key == 'api_token':
+                        credentials['api_token'] = value
+                    elif key == 'ads_board_id':
+                        credentials['ads_board_id'] = int(value)
+    except FileNotFoundError:
+        st.error("credentials.txt file not found. Please create it with your Monday.com API credentials.")
         st.stop()
     except Exception as e:
-        st.error(f"Error reading secrets: {str(e)}")
-        st.error("Please check your .streamlit/secrets.toml file configuration.")
+        st.error(f"Error reading credentials: {str(e)}")
         st.stop()
+    
+    return credentials
 
 credentials = load_credentials()
 API_TOKEN = credentials['api_token']
