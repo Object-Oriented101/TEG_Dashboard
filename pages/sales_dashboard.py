@@ -190,6 +190,8 @@ def process_sales_data(data):
     
     # Convert to DataFrame
     records = []
+    
+    
     for item in items:
         record = {
             "Item": item.get("name", ""),
@@ -212,7 +214,7 @@ def process_sales_data(data):
                 record["Contract Amount"] = text if text else ""
             elif col_id == "numbers3":  # Numbers3 column
                 record["Numbers3"] = text if text else ""
-            elif col_id == "person":  # Assigned Person
+            elif col_id == "color_mkvewcwe":  # Assigned Person dropdown field (CORRECT ONE)
                 record["Assigned Person"] = text if text else ""
             elif col_id == "status_14__1":  # Client Type (CORRECT COLUMN)
                 record["Client Type"] = text if text else ""
@@ -237,6 +239,7 @@ def process_sales_data(data):
                 record["Amount Paid or Contract Value"] = text if text else ""
         
         records.append(record)
+    
     
     df = pd.DataFrame(records)
     
